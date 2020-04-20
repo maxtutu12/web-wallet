@@ -18,5 +18,11 @@ func InitRouters() *gin.Engine {
 		account.GET("/balance", api.GetBalance)
 	}
 
+	transaction := r.Group("/api/transaction")
+	{
+		transaction.POST("send", api.SendTransaction)
+		transaction.GET("/gas_price", api.GetGasPrice)
+	}
+
 	return r
 }

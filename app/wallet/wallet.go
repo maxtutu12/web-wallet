@@ -5,20 +5,22 @@ import (
 	"errors"
 	"io/ioutil"
 	"log"
+	"math/big"
 	"web-wallet/app/config"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
 type Wallet struct {
-	client  *Client
-	keydir  string //key store directory
-	keyFile string //the account key store file
-	account string
-	key     *ecdsa.PrivateKey
+	client     *Client
+	keydir     string //key store directory
+	keyFile    string //the account key store file
+	account    string
+	privateKey *ecdsa.PrivateKey
 }
 
 var (
@@ -43,7 +45,6 @@ func NewWallet(keydir string) *Wallet {
 }
 
 func (w *Wallet) Create(password string) (string, error) {
-	log.Println("keystore dir:", w.keydir)
 	ks := keystore.NewKeyStore(w.keydir, keystore.StandardScryptN, keystore.StandardScryptP)
 
 	account, err := ks.NewAccount(password)
@@ -65,7 +66,7 @@ func (w *Wallet) importAccount(password string) (string, error) {
 
 	files, err := ioutil.ReadDir(w.keydir)
 	if err != nil {
-		log.Printf("read %s directory err:%v\n", w.keydir, err)
+		log.Printf("Read %s directory err:%v\n", w.keydir, err)
 		return "", err
 	}
 
@@ -80,7 +81,7 @@ func (w *Wallet) importAccount(password string) (string, error) {
 			}
 
 			//decrypt the private key successful
-			w.key = key.PrivateKey
+			w.privateKey = key.PrivateKey
 			w.account = key.Address.Hex()
 			w.keyFile = file.Name()
 			return w.account, nil
@@ -115,4 +116,57 @@ func (w *Wallet) getBalance() (string, error) {
 	}
 
 	return balance.String(), nil
+}
+
+func (w *Wallet) sendTransaction(toAccount string, amount, gasPrice *big.Int, gasLimit uint64) (string, error) {
+	if w.client == nil {
+		return "", errors.New("Please check network connection")
+	}
+
+	fromAddress := common.HexToAddress(w.account)
+
+	nonce, err := w.client.PendingNonceAt(fromAddress)
+	if err != nil {
+		log.Println("Get nonce err:", err)
+		return "", err
+	}
+
+	networkId, err := w.client.NetworkID()
+	if err != nil {
+		log.Println("Get network id err:", err)
+		return "", err
+	}
+
+	var data []byte
+
+	toAddress := common.HexToAddress(toAccount)
+	tx := types.NewTransaction(nonce, toAddress, amount, gasLimit, gasPrice, data)
+
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(networkId), w.privateKey)
+	if err != nil {
+		log.Println("Signed transaction err:", err)
+		return "", err
+	}
+
+	err = w.client.SendTransaction(signedTx)
+	if err != nil {
+		log.Println("Send transaction err:", err)
+		return "", err
+	}
+
+	return signedTx.Hash().Hex(), nil
+}
+
+func (w *Wallet) getGasPrice() (string, error) {
+	if w.client == nil {
+		return "", errors.New("Please check network connection")
+	}
+
+	gasPrice, err := w.client.SuggestGasPrice()
+	if err != nil {
+		log.Println("Get suggest gas price err:", err)
+		return "", err
+	}
+
+	return gasPrice.String(), nil
 }

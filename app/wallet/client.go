@@ -6,7 +6,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
@@ -28,6 +28,14 @@ func (c *Client) Connect(url string) {
 	c.conn = client
 }
 
+func (c *Client) NetworkID() (*big.Int, error) {
+	return c.conn.NetworkID(context.Background())
+}
+
+func (c *Client) SendTransaction(tx *types.Transaction) error {
+	return c.conn.SendTransaction(context.Background(), tx)
+}
+
 func (c *Client) BalanceAt(address common.Address, blockNumber *big.Int) (*big.Int, error) {
 	balance, err := c.conn.BalanceAt(context.Background(), address, blockNumber)
 	if err != nil {
@@ -35,4 +43,12 @@ func (c *Client) BalanceAt(address common.Address, blockNumber *big.Int) (*big.I
 		return nil, err
 	}
 	return balance, nil
+}
+
+func (c *Client) PendingNonceAt(address common.Address) (uint64, error) {
+	return c.conn.PendingNonceAt(context.Background(), address)
+}
+
+func (c *Client) SuggestGasPrice() (*big.Int, error) {
+	return c.conn.SuggestGasPrice(context.Background())
 }

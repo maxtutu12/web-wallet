@@ -28,6 +28,6 @@ func main() {
 	log.Println("Now the http server listen on:", addr)
 	err := srv.ListenAndServe()
 	if err != nil {
-		log.Fatalln("server listen err:", err)
+		log.Fatalln("Server listen err:", err)
 	}
 }
